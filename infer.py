@@ -102,30 +102,54 @@ model = MambaFormer(
 #                 num_classes=self.train_tuple.dataset.num_answers,
 #             )
 
-dset, loader, evaluator = eval_tuple
+test_tuple = get_data_tuple(
+                "test",
+                bs=my_dict["valid_batch_size"],
+                data_dir=my_dict["audio_dir"],
+                lang=my_dict["lang"],
+                shuffle=False,
+                drop_last=False,
+            )
+
 model = model.cuda()
 models = torch.load("/nfsshare/Amartya/A_question_answering/mamba/checkpoint_mamba/Hindi_small2/BEST.pth")
 # print(state_dict.keys())
 model.load_state_dict(models, strict=False)
 inputs = {}
-audio_speech = torch.ones(1, 16000).cuda()
-audio_sound = torch.ones(1, 16000).cuda()
-inputs['audio_feat'] = audio_speech
-inputs['image'] = audio_sound
+dset, loader, evaluator = test_tuple
+# audio_speech = torch.ones(1, 16000).cuda()
+# audio_sound = torch.ones(1, 16000).cuda()
+# inputs['audio_feat'] = audio_speech
+# inputs['image'] = audio_sound
 start_time = time.time()
 model.eval()
 
-with torch.no_grad():
-    flops, macs, params = calculate_flops(model=model, 
-                                         kwargs = inputs,
-                                         output_precision=4)
-    print("Mamba FLOPs:%s   MACs:%s   Params:%s \n" %(flops, macs, params))
-    # out = model(audio_speech, audio_sound)
-    print("Used memory:", info.used/1000000)
-end_time = time.time()
-print(f"Time {end_time-start_time}")
+# with torch.no_grad():
+#     flops, macs, params = calculate_flops(model=model, 
+#                                          kwargs = inputs,
+#                                          output_precision=4)
+#     print("Mamba FLOPs:%s   MACs:%s   Params:%s \n" %(flops, macs, params))
+#     # out = model(audio_speech, audio_sound)
+#     print("Used memory:", info.used/1000000)
+# end_time = time.time()
+# print(f"Time {end_time-start_time}")
 # model_dict(input_speech, input_sound)
-
+quesid2ans = {}
+for i, datum_tuple in enumerate(loader):
+    ques_id, audio_feat, image, target = (datum_tuple)
+    target = torch.stack(target)
+    with torch.no_grad():
+        audio_feat, image, target = (
+            audio_feat.float().cuda(),
+            image.float().cuda(),
+            target.cuda(),
+                )
+        logit = model(audio_feat, image)
+        score, label = logit.max(1)
+        for qid, l in zip(ques_id, label.cpu().numpy()):
+            ans = dset.label2ans[l]
+            quesid2ans[qid] = ans
+    evaluator.dump_result(quesid2ans, dump='/DATA/nfsshare/Amartya/A_question_answering/mamba/checkpoint_mamba/Hindi_small/test_result.json')
 
 
 
