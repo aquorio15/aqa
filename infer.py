@@ -136,15 +136,15 @@ model.eval()
 # model_dict(input_speech, input_sound)
 quesid2ans = {}
 for i, datum_tuple in enumerate(loader):
-    ques_id, audio_feat, image, target = (datum_tuple)
+    ques_id, audio_feat1, audio_feat2, target = (datum_tuple)
     target = torch.stack(target)
     with torch.no_grad():
-        audio_feat, image, target = (
-            audio_feat.float().cuda(),
-            image.float().cuda(),
+        audio_feat1, audio_feat2, target = (
+            audio_feat1.float().cuda(),
+            audio_feat2.float().cuda(),
             target.cuda(),
                 )
-        logit = model(audio_feat, image)
+        logit = model(audio_feat1, audio_feat2)
         score, label = logit.max(1)
         for qid, l in zip(ques_id, label.cpu().numpy()):
             ans = dset.label2ans[l]
